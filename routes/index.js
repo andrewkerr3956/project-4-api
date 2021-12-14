@@ -2,9 +2,7 @@ var express = require('express');
 var router = express.Router();
 var yahoo =  require('yahoo-stock-prices');
 import { Sequelize, Model, DataType } from 'sequelize';
-const sequelize = new Sequelize('Users', 'root', 'root', {
-  dialect: 'mysql'
-}); 
+const sequelize = require('../lib/db.js');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
