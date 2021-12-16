@@ -22,6 +22,19 @@ router.get('/api/search/:symbol', async (req, res) => {
   }
 });
 
+router.get('/api/portfolio/:userid', async (req, res) => {
+  let userid = req.params.userid;
+  mysql.conn.query(`SELECT * FROM Portfolio WHERE userid=${userid}`, async (err, results) => {
+    if (err) throw err;
+    if (results.length > 0) {
+      res.send({ results })
+    }
+    else {
+      console.log("Nothing retrieved at that id.")
+    }
+  })
+})
+
 // Checking if the credentials match when you login.
 router.post('/api/portfolio/', async (req, res) => {
   let username = req.body.username;
