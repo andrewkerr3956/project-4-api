@@ -24,7 +24,7 @@ router.get('/api/search/:symbol', async (req, res) => {
 
 router.get('/api/portfolio/:userid', async (req, res) => {
   let userid = req.params.userid;
-  mysql.conn.query(`SELECT * FROM Portfolio WHERE userid=${userid}`, async (err, results) => {
+  mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid=${userid} `, async (err, results) => {
     if (err) throw err;
     if (results.length > 0) {
       res.send({ results })
@@ -48,6 +48,16 @@ router.post('/api/portfolio/', async (req, res) => {
       let matchPassword = await bcrypt.compare(password.toString(), results[0].password.toString());
       if (matchPassword) {
         console.log("Logged in!!!");
+        console.log("Retrieving portfolio...");
+        mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid = ${results.userid}`, async(req, res) => {
+          if(results > 0) {
+            console.log("Portfolio successfully retrieved!");
+            res.send({ results });
+          }
+          else {
+            res.send( {error} );
+          }
+        });
         res.send({ results });
       }
       else {
@@ -75,6 +85,10 @@ router.put('/api/portfolio/', async (req, res) => {
       // Encrypt the password
       let password = bcrypt.hashSync(req.body.password, 10);
       mysql.conn.query(`INSERT INTO Users (username, password) VALUES ('${username}', '${password}')`, async (err, results) => {
+        if (err) throw err;
+        console.log(results);
+      });
+      mysql.conn.query(`UPDATE Users SET portfolioid=LAST_INSERT_ID() WHERE userid=LAST_INSERT_ID()`, async (err, results) => {
         if (err) throw err;
         console.log(results);
       });
