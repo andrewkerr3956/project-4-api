@@ -48,17 +48,14 @@ router.post('/api/portfolio/', async (req, res) => {
       let matchPassword = await bcrypt.compare(password.toString(), results[0].password.toString());
       if (matchPassword) {
         console.log("Logged in!!!");
-        console.log("Retrieving portfolio...");
-        mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid = ${results.userid}`, async(req, res) => {
+        console.log(`Retrieving portfolio at ${results[0].userid}...`);
+        mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid = ${results[0].userid}`, async(err, results) => {
+          if(err) throw err;
           if(results > 0) {
             console.log("Portfolio successfully retrieved!");
-            res.send({ results });
           }
-          else {
-            res.send( {error} );
-          }
-        });
-        res.send({ results });
+          res.send( { results } );
+        });     
       }
       else {
         res.send({ error })
@@ -68,6 +65,7 @@ router.post('/api/portfolio/', async (req, res) => {
       res.send({ error });
     }
   });
+  
 
 });
 
