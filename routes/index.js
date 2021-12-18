@@ -27,6 +27,7 @@ router.get('/api/portfolio/:userid', async (req, res) => {
   mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid=${userid} `, async (err, results) => {
     if (err) throw err;
     if (results.length > 0) {
+      console.log(results);
       res.send({ results })
     }
     else {
@@ -94,5 +95,21 @@ router.put('/api/portfolio/', async (req, res) => {
   });
 });
 
+router.put('/api/portfolio/save', async(req, res) => {
+  const error = "Portfolio could not be saved."
+  let collection = req.body.portfolioData
+  console.log(collection);
+  mysql.conn.query(`UPDATE Portfolio SET collection = '${JSON.stringify(collection)}' WHERE portfolioid = ${req.body.portfolioId}`, async(err, results) => {
+    if (err) throw err;
+    console.log(results);
+    if(results.changedRows > 0) {
+      res.send({ results });
+    }
+    else {
+      res.send({ error });
+    }
+    console.log(results)
+  })
+});
 
 module.exports = router;
