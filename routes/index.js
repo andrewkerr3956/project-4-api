@@ -98,8 +98,9 @@ router.put('/api/portfolio/', async (req, res) => {
 router.put('/api/portfolio/save', async(req, res) => {
   const error = "Portfolio could not be saved."
   let collection = req.body.portfolioData
+  let wallet = req.body.currentWallet
   console.log(collection);
-  mysql.conn.query(`UPDATE Portfolio SET collection = '${JSON.stringify(collection)}' WHERE portfolioid = ${req.body.portfolioId}`, async(err, results) => {
+  mysql.conn.query(`UPDATE Portfolio SET collection = '${JSON.stringify(collection)}', wallet=${wallet} WHERE portfolioid = ${req.body.portfolioId}`, async(err, results) => {
     if (err) throw err;
     console.log(results);
     if(results.changedRows > 0) {
