@@ -1,8 +1,11 @@
 var express = require('express');
 var router = express.Router();
 var yahoo = require('yahoo-stock-prices');
+const chart = require('chart.js');
 const bcrypt = require('bcrypt');
 const mysql = require('../lib/db.js');
+const canvas = require('canvas');
+const chartRender = require('../lib/chartRender.js');
 
 
 /* GET home page. */
@@ -20,6 +23,48 @@ router.get('/api/search/:symbol', async (req, res) => {
     console.log(e)
     res.send({ error });
   }
+});
+
+router.get('/api/chart/', async(req, res) => {
+  let thisChart = chartRender.myCanvas
+  let stockChart = new chart.Chart(thisChart, {
+    type: 'line',
+    data: {
+      labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+      datasets: [{
+          label: 'Financial Data',
+          data: [12, 19, 3, 5, 2, 3],
+          backgroundColor: [
+              'rgba(255, 99, 132, 0.2)',
+              'rgba(54, 162, 235, 0.2)',
+              'rgba(255, 206, 86, 0.2)',
+              'rgba(75, 192, 192, 0.2)',
+              'rgba(153, 102, 255, 0.2)',
+              'rgba(255, 159, 64, 0.2)'
+          ],
+          borderColor: [
+              'rgba(255, 99, 132, 1)',
+              'rgba(54, 162, 235, 1)',
+              'rgba(255, 206, 86, 1)',
+              'rgba(75, 192, 192, 1)',
+              'rgba(153, 102, 255, 1)',
+              'rgba(255, 159, 64, 1)'
+          ],
+          borderWidth: 1
+      }],
+      options: {
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+  },
+  })
+  let img = new canvas.Image();
+  img = thisChart.toDataURL();
+  res.send({img});
+  stockChart.destroy();
 });
 
 router.get('/api/portfolio/:userid', async (req, res) => {
@@ -50,13 +95,13 @@ router.post('/api/portfolio/', async (req, res) => {
       if (matchPassword) {
         console.log("Logged in!!!");
         console.log(`Retrieving portfolio at ${results[0].userid}...`);
-        mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid = ${results[0].userid}`, async(err, results) => {
-          if(err) throw err;
-          if(results > 0) {
+        mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid = ${results[0].userid}`, async (err, results) => {
+          if (err) throw err;
+          if (results > 0) {
             console.log("Portfolio successfully retrieved!");
           }
-          res.send( { results } );
-        });     
+          res.send({ results });
+        });
       }
       else {
         res.send({ error })
@@ -66,7 +111,7 @@ router.post('/api/portfolio/', async (req, res) => {
       res.send({ error });
     }
   });
-  
+
 
 });
 
@@ -95,15 +140,15 @@ router.put('/api/portfolio/', async (req, res) => {
   });
 });
 
-router.put('/api/portfolio/save', async(req, res) => {
+router.put('/api/portfolio/save', async (req, res) => {
   const error = "Portfolio could not be saved."
   let collection = req.body.portfolioData
   let wallet = req.body.currentWallet
   console.log(collection);
-  mysql.conn.query(`UPDATE Portfolio SET collection = '${JSON.stringify(collection)}', wallet=${wallet} WHERE portfolioid = ${req.body.portfolioId}`, async(err, results) => {
+  mysql.conn.query(`UPDATE Portfolio SET collection = '${JSON.stringify(collection)}', wallet=${wallet} WHERE portfolioid = ${req.body.portfolioId}`, async (err, results) => {
     if (err) throw err;
     console.log(results);
-    if(results.changedRows > 0) {
+    if (results.changedRows > 0) {
       res.send({ results });
     }
     else {
