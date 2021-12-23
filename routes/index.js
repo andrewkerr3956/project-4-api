@@ -30,40 +30,42 @@ router.get('/api/search/:symbol', async (req, res) => {
 // Route to create a chart with Chart.js using data retrieved from the Yahoo Stock Prices API
 router.get('/api/chart/:symbol', async (req, res) => {
   const today = new Date();
-  const startMonth = today.getMonth() - 3; // startMonth will be 3 months prior to the current month.
-  const startYear = today.getFullYear();
+  let startMonth = today.getMonth() - 3; // startMonth will be 3 months prior to the current month.
+  let startYear = today.getFullYear();
   // This conditional will make sure that the current month cannot be less than 0 (January).
-  if(startMonth < 0) {
-    if(startMonth === -1) {
+  if(startMonth < 1) {
+    if(startMonth === 0) {
       // If the startMonth is 1 behind January, it becomes December. Also, the year is not the current year, so it's the year before.
+      startMonth = 12;
+      startYear = today.getFullYear() - 1;
+    }
+    else if(startMonth === -1) {
+      // If the startMonth is 2 behind January, it becomes November. Also, the year is not the current year, so it's the year before.
       startMonth = 11;
       startYear = today.getFullYear() - 1;
     }
     else if(startMonth === -2) {
-      // If the startMonth is 2 behind January, it becomes November. Also, the year is not the current year, so it's the year before.
+      // If the startMonth is 3 behind January, it becomes October. Also, the year is not the current year, so it's the year before.
       startMonth = 10;
       startYear = today.getFullYear() - 1;
     }
-    else if(startMonth === -3) {
-      // If the startMonth is 3 behind January, it becomes October. Also, the year is not the current year, so it's the year before.
-      startMonth = 9;
+    else {
+      // If all else fails somehow, the startMonth will be January. Also, the year is not the current year, so it's the year before.
+      startMonth = 1;
       startYear = today.getFullYear() - 1;
     }
-    else {
-      // If all else fails somehow, the startMonth will be January.
-      startMonth = 0;
-    }
   }
-  const endMonth = today.getMonth() + 1 /* The +1 is needed here since the endMonth parameter of the API will not return any data from that month 
+  let endMonth = today.getMonth() + 1 /* The +1 is needed here since the endMonth parameter of the API will not return any data from that month 
   (we want to display data for the current month as well). */
+  console.log("startMonth ", startMonth, "endMonth ", endMonth)
 
-  // This conditional will make sure that the current month cannot be less than 0 (January).
-  if(endMonth > 11) {
+  // This conditional will make sure that the current month cannot be greater than 12 (December).
+  if(endMonth > 12) {
     // If the end month is greater than 11 (December), set it to 11.
-    endMonth = 11;
+    endMonth = 12;
   }
 
-  let history = await yahoo.getHistoricalPrices(startMonth, 1, today.getFullYear(), endMonth, today.getDay(),
+  let history = await yahoo.getHistoricalPrices(startMonth, 1, startYear, endMonth, today.getDay(),
     today.getFullYear(), req.params.symbol, "1wk");
   history.shift(); // This chops off an extra piece of data that would cause problems if it were there. 
   let historyPrice = [];
@@ -76,7 +78,6 @@ router.get('/api/chart/:symbol', async (req, res) => {
   })
   let historyDate = [];
   history.map((item) => {
-    console.log("item.date: ", item.date)
     if (item.adjclose !== undefined) {
       // For some stocks, sometimes the price will come up as undefined, we will remove the dates of those so the chart doesn't display a gap.
       let newDate = new Date(item.date * 1000);
