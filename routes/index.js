@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const mysql = require('../lib/db.js');
 const canvas = require('canvas');
 const chartRender = require('../lib/chartRender.js');
+const moment = require('moment');
 
 
 /* GET home page. */
@@ -25,45 +26,70 @@ router.get('/api/search/:symbol', async (req, res) => {
   }
 });
 
-router.get('/api/chart/', async(req, res) => {
+router.get('/api/chart/:symbol', async (req, res) => {
+  const today = new Date();
+  let history = await yahoo.getHistoricalPrices(today.getMonth() - 3, 1, today.getFullYear(), today.getMonth(), today.getDay(),
+    today.getFullYear(), req.params.symbol, "1wk");
+  history.shift();
+  let historyPrice = [];
+  history.map((item) => {
+    console.log("the item: ", item);
+    if (item.adjclose !== undefined) {
+      historyPrice.push(item.adjclose);
+    }
+  })
+  let historyDate = [];
+  history.map((item) => {
+    console.log("item.date: ", item.date)
+    if (item.adjclose !== undefined) {
+      let newDate = new Date(item.date * 1000);
+      let formatDate = moment(newDate);
+      formatDate = formatDate.format("YYYY-MM-DD");
+      console.log("newDate: ", formatDate)
+      historyDate.push(formatDate);
+    }
+  });
+  console.log(historyDate);
+  let displayDates = historyDate.reverse();
+  let displayPrices = historyPrice.reverse();
   let thisChart = chartRender.myCanvas
   let stockChart = new chart.Chart(thisChart, {
     type: 'line',
     data: {
-      labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+      labels: displayDates.map((item) => item),
       datasets: [{
-          label: 'Financial Data',
-          data: [12, 19, 3, 5, 2, 3],
-          backgroundColor: [
-              'rgba(255, 99, 132, 0.2)',
-              'rgba(54, 162, 235, 0.2)',
-              'rgba(255, 206, 86, 0.2)',
-              'rgba(75, 192, 192, 0.2)',
-              'rgba(153, 102, 255, 0.2)',
-              'rgba(255, 159, 64, 0.2)'
-          ],
-          borderColor: [
-              'rgba(255, 99, 132, 1)',
-              'rgba(54, 162, 235, 1)',
-              'rgba(255, 206, 86, 1)',
-              'rgba(75, 192, 192, 1)',
-              'rgba(153, 102, 255, 1)',
-              'rgba(255, 159, 64, 1)'
-          ],
-          borderWidth: 1
-      }],
-      options: {
-        scales: {
-            y: {
-                beginAtZero: true
-            }
+        label: req.params.symbol,
+        data: displayPrices.map((item) => item),
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)'
+        ],
+        borderColor: [
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true
         }
+      }
     }
-  },
-  })
+  });
   let img = new canvas.Image();
   img = thisChart.toDataURL();
-  res.send({img});
+  res.send({ img });
   stockChart.destroy();
 });
 
