@@ -4,16 +4,18 @@ var yahoo = require('yahoo-stock-prices');
 const chart = require('chart.js');
 const bcrypt = require('bcrypt');
 const mysql = require('../lib/db.js');
+const mysql2 = require('mysql2');
 const canvas = require('canvas');
 const chartRender = require('../lib/chartRender.js');
 const transactionRender = require('../lib/transactionRender.js');
 const moment = require('moment');
 
 
+
 /* GET home page. */
 router.get('/', function (req, res, next) {
   res.render('index', { title: 'Express' });
-  mysql.conn.connect();
+  // mysql.conn.connect();
 });
 
 // Route to retrieve the Financial Data from Yahoo Stock Prices API
@@ -134,8 +136,9 @@ router.get('/api/chart/:symbol', async (req, res) => {
 
 // Route to retrieve the user's portfolio upon request based on userid.
 router.get('/api/portfolio/:userid', async (req, res) => {
+  mysql.conn.connect();
   let userid = req.params.userid;
-  mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid=${userid} `, async (err, results) => {
+  mysql.conn.execute("SELECT * FROM vw_UserPortfolio WHERE userid= ?", [userid], async (err, results) => {
     if (err) throw err;
     if (results.length > 0) {
       console.log(results);
@@ -145,6 +148,7 @@ router.get('/api/portfolio/:userid', async (req, res) => {
       console.log("Nothing retrieved at that id.")
     }
   })
+  mysql.conn.end();
 })
 
 /* Route to create a chart for the user's transactions history. Getting the userid or info from database is unnecessary since sessionStorage
@@ -153,7 +157,7 @@ router.get('/api/portfolio/:userid', async (req, res) => {
 router.post('/api/portfolio/view/', async (req, res) => {
   let transactionData = req.body.transactions;
   let transactionNumbers = [];
-  for(let i=1; i <= transactionData.length; i++) {
+  for(let i=1; i <= transactionData.length; i++) { // We use 1 as the start because we are using it as Transaction #'s not array indexes
     transactionNumbers.push(i);
   }
   let thisChart = transactionRender.transactionCanvas;
@@ -201,10 +205,11 @@ router.post('/api/portfolio/view/', async (req, res) => {
 // Route to check if the credentials match when you login.
 // POST request was used here since GET requests are not ideal for dealing with sensitive information.
 router.post('/api/portfolio/', async (req, res) => {
+  mysql.conn.connect();
   let username = req.body.username;
   let password = req.body.password;
   // Decrypt the password to check if they match.
-  mysql.conn.query(`SELECT * FROM Users WHERE username='${username}'`, async (err, results) => {
+  mysql.conn.execute("SELECT * FROM Users WHERE username = ?", [username], async (err, results) => {
     if (err) throw err;
     const error = "Invalid login information."
     if (results.length > 0) {
@@ -212,7 +217,7 @@ router.post('/api/portfolio/', async (req, res) => {
       let matchPassword = await bcrypt.compare(password.toString(), results[0].password.toString());
       if (matchPassword) { // Passwords match
         // Retrieve from a view I made in the database that joins the users and portfolio tables on portfolioid. User and portfolio id will be the same.
-        mysql.conn.query(`SELECT * FROM vw_UserPortfolio WHERE userid = ${results[0].userid}`, async (err, results) => {
+        mysql.conn.execute("SELECT * FROM vw_UserPortfolio WHERE userid = ?", [results[0].userid], async (err, results) => {
           if (err) throw err;
           if (results > 0) {
             console.log("Portfolio successfully retrieved!");
@@ -223,6 +228,7 @@ router.post('/api/portfolio/', async (req, res) => {
       else {
         res.send({ error })
       }
+      mysql.conn.end();
     }
     else {
       res.send({ error });
@@ -235,9 +241,10 @@ router.post('/api/portfolio/', async (req, res) => {
 // Inserting a new user into database
 // PUT was used here because as seen above, since I used a POST request to handle sensitive information using the same route.  
 router.put('/api/portfolio/', async (req, res) => {
+  mysql.conn.connect();
   let username = req.body.username;
   // Check if the username already exists
-  mysql.conn.query(`SELECT * FROM Users WHERE Username = '${username}'`, async (err, results) => {
+  mysql.conn.execute("SELECT * FROM Users WHERE username = ?", [username], async (err, results) => {
     if (err) throw err;
     const error = "Username already exists!";
     if (results.length > 0) {
@@ -246,27 +253,29 @@ router.put('/api/portfolio/', async (req, res) => {
     else {
       // Encrypt the password
       let password = bcrypt.hashSync(req.body.password, 10);
-      mysql.conn.query(`INSERT INTO Users (username, password) VALUES ('${username}', '${password}')`, async (err, results) => {
+      mysql.conn.execute("INSERT INTO Users (username, password) VALUES (?, ?)", [username, password], async (err, results) => {
         if (err) throw err;
         console.log(results);
       });
       // I have my database automatically create a new portfolio when a user is made, this just matches the ids in the users table so they will be able to be joined.
-      mysql.conn.query(`UPDATE Users SET portfolioid=LAST_INSERT_ID() WHERE userid=LAST_INSERT_ID()`, async (err, results) => {
+      mysql.conn.execute("UPDATE Users SET portfolioid=LAST_INSERT_ID() WHERE userid=LAST_INSERT_ID()", async (err, results) => {
         if (err) throw err;
         console.log(results);
       });
+      mysql.conn.end();
     }
   });
 });
 
 // Route used to save the portfolio.
 router.put('/api/portfolio/save', async (req, res) => {
+  mysql.conn.connect();
   const error = "Portfolio could not be saved."
   let collection = req.body.portfolioData
   let wallet = req.body.currentWallet
   let transactions = req.body.transactions;
   // Update the user's collection and wallet in their portfolio
-  mysql.conn.query(`UPDATE Portfolio SET collection='${JSON.stringify(collection)}', wallet=${wallet}, transactions='${JSON.stringify(transactions)}' WHERE portfolioid = ${req.body.portfolioId}`, async (err, results) => {
+  mysql.conn.execute("UPDATE Portfolio SET collection = ?, wallet = ?, transactions = ? WHERE portfolioid = ?", [JSON.stringify(collection), wallet, JSON.stringify(transactions), req.body.portfolioId],  async (err, results) => {
     if (err) throw err;
     if (results.changedRows > 0) {
       // We use changedRows because that tells us if anything was actually updated.
@@ -276,6 +285,7 @@ router.put('/api/portfolio/save', async (req, res) => {
       res.send({ error });
     }
   })
+  mysql.conn.end();
 });
 
 module.exports = router;
