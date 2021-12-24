@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const mysql = require('../lib/db.js');
 const canvas = require('canvas');
 const chartRender = require('../lib/chartRender.js');
+const transactionRender = require('../lib/transactionRender.js');
 const moment = require('moment');
 
 
@@ -33,18 +34,18 @@ router.get('/api/chart/:symbol', async (req, res) => {
   let startMonth = today.getMonth() - 3; // startMonth will be 3 months prior to the current month.
   let startYear = today.getFullYear();
   // This conditional will make sure that the current month cannot be less than 0 (January).
-  if(startMonth < 1) {
-    if(startMonth === 0) {
+  if (startMonth < 1) {
+    if (startMonth === 0) {
       // If the startMonth is 1 behind January, it becomes December. Also, the year is not the current year, so it's the year before.
       startMonth = 12;
       startYear = today.getFullYear() - 1;
     }
-    else if(startMonth === -1) {
+    else if (startMonth === -1) {
       // If the startMonth is 2 behind January, it becomes November. Also, the year is not the current year, so it's the year before.
       startMonth = 11;
       startYear = today.getFullYear() - 1;
     }
-    else if(startMonth === -2) {
+    else if (startMonth === -2) {
       // If the startMonth is 3 behind January, it becomes October. Also, the year is not the current year, so it's the year before.
       startMonth = 10;
       startYear = today.getFullYear() - 1;
@@ -60,7 +61,7 @@ router.get('/api/chart/:symbol', async (req, res) => {
   console.log("startMonth ", startMonth, "endMonth ", endMonth)
 
   // This conditional will make sure that the current month cannot be greater than 12 (December).
-  if(endMonth > 12) {
+  if (endMonth > 12) {
     // If the end month is greater than 11 (December), set it to 11.
     endMonth = 12;
   }
@@ -70,7 +71,6 @@ router.get('/api/chart/:symbol', async (req, res) => {
   history.shift(); // This chops off an extra piece of data that would cause problems if it were there. 
   let historyPrice = [];
   history.map((item) => {
-    console.log("the item: ", item);
     if (item.adjclose !== undefined) {
       // For some stocks, sometimes the price will come up as undefined, we will remove those so the chart doesn't display a gap.
       historyPrice.push(item.adjclose);
@@ -87,7 +87,7 @@ router.get('/api/chart/:symbol', async (req, res) => {
     }
   });
   // The dates and prices of the stocks show up from more recent to older. So we reverse that here so it's older to current, so the chart makes more sense. 
-  let displayDates = historyDate.reverse(); 
+  let displayDates = historyDate.reverse();
   let displayPrices = historyPrice.reverse();
   // This is where the chart is drawn.
   let thisChart = chartRender.myCanvas
@@ -146,6 +146,57 @@ router.get('/api/portfolio/:userid', async (req, res) => {
     }
   })
 })
+
+/* Route to create a chart for the user's transactions history. Getting the userid or info from database is unnecessary since sessionStorage
+ has the most up-to-date infomation on the user's transactions history. */
+// Using POST because it is easier to send the transactions array over.
+router.post('/api/portfolio/view/', async (req, res) => {
+  let transactionData = req.body.transactions;
+  let transactionNumbers = [];
+  for(let i=1; i <= transactionData.length; i++) {
+    transactionNumbers.push(i);
+  }
+  let thisChart = transactionRender.transactionCanvas;
+  let transactionChart = new chart.Chart(thisChart, {
+    type: 'line',
+    data: {
+      labels: transactionNumbers.map((item) => item),
+      datasets: [{
+        label: "Wallet Balance",
+        data: transactionData.map((item) => item),
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)',
+          'rgba(255, 99, 132, 0.2)'
+        ],
+        borderColor: [
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(255, 99, 132, 1)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+  // We're converting the drawn chart to an Image.
+  let img = new canvas.Image();
+  img = thisChart.toDataURL(); // This makes it work with the src attribute of the HTML img element.
+  res.send({ img });
+  transactionChart.destroy(); // Chart.js requires that we destroy the instance so that it can draw a new one next time.
+});
 
 // Route to check if the credentials match when you login.
 // POST request was used here since GET requests are not ideal for dealing with sensitive information.
@@ -213,9 +264,9 @@ router.put('/api/portfolio/save', async (req, res) => {
   const error = "Portfolio could not be saved."
   let collection = req.body.portfolioData
   let wallet = req.body.currentWallet
-  console.log(collection);
+  let transactions = req.body.transactions;
   // Update the user's collection and wallet in their portfolio
-  mysql.conn.query(`UPDATE Portfolio SET collection = '${JSON.stringify(collection)}', wallet=${wallet} WHERE portfolioid = ${req.body.portfolioId}`, async (err, results) => {
+  mysql.conn.query(`UPDATE Portfolio SET collection='${JSON.stringify(collection)}', wallet=${wallet}, transactions='${JSON.stringify(transactions)}' WHERE portfolioid = ${req.body.portfolioId}`, async (err, results) => {
     if (err) throw err;
     if (results.changedRows > 0) {
       // We use changedRows because that tells us if anything was actually updated.
